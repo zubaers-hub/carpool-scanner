@@ -6,7 +6,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <title>Carpool Scanner</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -34,6 +33,55 @@
     overflow: hidden;
   }
 
+  /* PIN screen */
+  .pin-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    z-index: 999;
+  }
+  .pin-screen.hidden { display: none; }
+  .pin-logo  { font-size: 52px; }
+  .pin-title { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+  .pin-sub   { font-size: 14px; color: var(--muted); }
+  .pin-dots  { display: flex; gap: 14px; margin: 4px 0; }
+  .pin-dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--muted);
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .pin-dot.filled { background: var(--accent); border-color: var(--accent); }
+  .pin-dot.error  { background: var(--danger); border-color: var(--danger); }
+  .pin-pad {
+    display: grid;
+    grid-template-columns: repeat(3, 72px);
+    grid-template-rows: repeat(4, 72px);
+    gap: 10px;
+  }
+  .pin-btn {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    color: var(--text);
+    font-size: 22px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.1s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .pin-btn:active { background: var(--accent-dim); transform: scale(0.93); }
+  .pin-btn.empty  { background: transparent; border-color: transparent; pointer-events: none; }
+  .pin-error { font-size: 13px; color: var(--danger); height: 18px; }
+
   /* Header */
   .header {
     background: var(--surface);
@@ -44,26 +92,20 @@
     justify-content: space-between;
     flex-shrink: 0;
   }
-
   .header-left { display: flex; align-items: center; gap: 10px; }
-
   .dot {
     width: 10px; height: 10px;
     border-radius: 50%;
-    background: var(--muted);
-    transition: background 0.3s;
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+    animation: pulse 1.2s infinite;
   }
-  .dot.active { background: var(--success); box-shadow: 0 0 8px var(--success); }
-  .dot.scanning { background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: pulse 1.2s infinite; }
-
   @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.4; }
   }
-
   .header h1 { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
   .header-status { font-size: 12px; color: var(--muted); }
-
   .scan-count {
     background: var(--accent);
     color: white;
@@ -74,140 +116,67 @@
     min-width: 32px;
     text-align: center;
   }
+  .lock-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .lock-btn:active { background: var(--border); }
 
   /* Main layout */
   .main {
     display: flex;
     flex: 1;
     overflow: hidden;
-    gap: 0;
   }
 
-  /* Camera panel */
-  .camera-panel {
+  /* Scanner input panel */
+  .input-panel {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 20px;
-    position: relative;
-    min-width: 0;
+    padding: 32px 24px;
+    gap: 24px;
   }
-
-  .video-wrapper {
-    position: relative;
+  .scanner-icon { font-size: 72px; opacity: 0.15; }
+  .ready-label  { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+  .sub-label    { font-size: 14px; color: var(--muted); text-align: center; line-height: 1.5; max-width: 280px; }
+  .scan-input-wrapper { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 10px; }
+  .scan-input {
     width: 100%;
-    max-width: 420px;
-    aspect-ratio: 1;
-    border-radius: 16px;
-    overflow: hidden;
-    background: #000;
-    box-shadow: 0 0 0 2px var(--border), 0 20px 60px rgba(0,0,0,0.5);
-  }
-
-  video, canvas {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    object-fit: cover;
-  }
-
-  canvas { display: none; }
-
-  /* Scanner overlay */
-  .scan-overlay {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-  }
-
-  .scan-frame {
-    width: 60%;
-    aspect-ratio: 1;
-    position: relative;
-  }
-
-  .scan-frame::before, .scan-frame::after,
-  .scan-frame span::before, .scan-frame span::after {
-    content: '';
-    position: absolute;
-    width: 24px; height: 24px;
-    border-color: white;
-    border-style: solid;
-    opacity: 0.9;
-  }
-  .scan-frame::before { top: 0; left: 0; border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
-  .scan-frame::after  { top: 0; right: 0; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
-  .scan-frame span::before { bottom: 0; left: 0; border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
-  .scan-frame span::after  { bottom: 0; right: 0; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
-
-  .scan-line {
-    position: absolute;
-    left: 8%; right: 8%;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--accent), transparent);
-    animation: scan 2s ease-in-out infinite;
-    border-radius: 2px;
-  }
-
-  @keyframes scan {
-    0% { top: 10%; opacity: 0; }
-    10% { opacity: 1; }
-    90% { opacity: 1; }
-    100% { top: 90%; opacity: 0; }
-  }
-
-  /* Flash overlay */
-  .flash {
-    position: absolute;
-    inset: 0;
-    background: white;
-    opacity: 0;
-    pointer-events: none;
-    border-radius: 16px;
-    transition: opacity 0.05s;
-  }
-  .flash.go { opacity: 0.6; }
-
-  /* Camera label */
-  .camera-label {
-    margin-top: 14px;
-    font-size: 13px;
-    color: var(--muted);
-    text-align: center;
-  }
-
-  /* Start button */
-  .btn-start {
-    margin-top: 16px;
-    background: var(--accent);
-    color: white;
-    border: none;
-    border-radius: 12px;
-    padding: 14px 32px;
-    font-size: 16px;
+    background: var(--card);
+    border: 2px solid var(--accent);
+    border-radius: 14px;
+    color: var(--text);
+    font-size: 24px;
     font-weight: 600;
-    cursor: pointer;
-    transition: background 0.2s, transform 0.1s;
-    -webkit-tap-highlight-color: transparent;
+    padding: 18px 20px;
+    outline: none;
+    text-align: center;
+    letter-spacing: 2px;
+    -webkit-appearance: none;
+    caret-color: var(--accent);
   }
-  .btn-start:active { background: var(--accent-dim); transform: scale(0.97); }
-  .btn-start.hidden { display: none; }
+  .scan-input::placeholder { color: var(--muted); font-size: 15px; font-weight: 400; letter-spacing: 0; }
+  .scan-input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(59,130,246,0.15); }
+  .hint { font-size: 12px; color: var(--muted); text-align: center; }
 
-  /* Right panel — recent scans */
+  /* Scans panel */
   .scans-panel {
-    width: 280px;
+    width: 300px;
     background: var(--surface);
     border-left: 1px solid var(--border);
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
   }
-
   .panel-header {
     padding: 14px 16px;
     border-bottom: 1px solid var(--border);
@@ -220,7 +189,6 @@
     justify-content: space-between;
     align-items: center;
   }
-
   .clear-btn {
     background: none;
     border: 1px solid var(--border);
@@ -232,7 +200,6 @@
     -webkit-tap-highlight-color: transparent;
   }
   .clear-btn:active { background: var(--border); }
-
   .scans-list {
     flex: 1;
     overflow-y: auto;
@@ -241,7 +208,6 @@
     flex-direction: column;
     gap: 6px;
   }
-
   .scan-item {
     background: var(--card);
     border-radius: 10px;
@@ -249,18 +215,13 @@
     border-left: 3px solid var(--accent);
     animation: slideIn 0.25s ease;
   }
-
   .scan-item.error { border-left-color: var(--danger); }
-  .scan-item.duplicate { border-left-color: var(--warning); }
-
   @keyframes slideIn {
     from { opacity: 0; transform: translateX(10px); }
     to   { opacity: 1; transform: translateX(0); }
   }
-
   .scan-name { font-size: 15px; font-weight: 600; line-height: 1.2; }
   .scan-meta { font-size: 11px; color: var(--muted); margin-top: 3px; }
-
   .empty-state {
     flex: 1;
     display: flex;
@@ -273,7 +234,6 @@
     padding: 20px;
     text-align: center;
   }
-
   .empty-icon { font-size: 32px; opacity: 0.4; }
 
   /* Toast */
@@ -281,7 +241,7 @@
     position: fixed;
     bottom: 24px;
     left: 50%;
-    transform: translateX(-50%) translateY(80px);
+    transform: translateX(-50%) translateY(120px);
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 14px;
@@ -295,88 +255,79 @@
     transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     z-index: 100;
   }
-
   .toast.show { transform: translateX(-50%) translateY(0); }
-
   .toast-icon { font-size: 28px; flex-shrink: 0; }
   .toast-name { font-size: 17px; font-weight: 700; }
   .toast-sub  { font-size: 12px; color: var(--muted); margin-top: 1px; }
 
-  /* Manual input */
-  .manual-bar {
-    background: var(--surface);
-    border-top: 1px solid var(--border);
-    padding: 10px 16px;
-    display: flex;
-    gap: 8px;
-    flex-shrink: 0;
-  }
-
-  .manual-input {
-    flex: 1;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    color: var(--text);
-    font-size: 15px;
-    padding: 10px 14px;
-    outline: none;
-    -webkit-appearance: none;
-  }
-  .manual-input:focus { border-color: var(--accent); }
-  .manual-input::placeholder { color: var(--muted); }
-
-  .manual-submit {
-    background: var(--accent);
-    color: white;
-    border: none;
-    border-radius: 10px;
-    padding: 10px 16px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .manual-submit:active { background: var(--accent-dim); }
-
   @media (max-width: 600px) {
-    .scans-panel { width: 200px; }
+    .scans-panel { width: 180px; }
     .scan-name { font-size: 13px; }
   }
 </style>
 </head>
 <body>
 
+<!-- PIN Lock Screen -->
+<div class="pin-screen" id="pinScreen">
+  <div class="pin-logo">🔒</div>
+  <div class="pin-title">Staff Access Only</div>
+  <div class="pin-sub">Enter PIN to continue</div>
+  <div class="pin-dots" id="pinDots">
+    <div class="pin-dot" id="pd0"></div>
+    <div class="pin-dot" id="pd1"></div>
+    <div class="pin-dot" id="pd2"></div>
+    <div class="pin-dot" id="pd3"></div>
+  </div>
+  <div class="pin-error" id="pinError"></div>
+  <div class="pin-pad">
+    <button class="pin-btn" onclick="pinPress('1')">1</button>
+    <button class="pin-btn" onclick="pinPress('2')">2</button>
+    <button class="pin-btn" onclick="pinPress('3')">3</button>
+    <button class="pin-btn" onclick="pinPress('4')">4</button>
+    <button class="pin-btn" onclick="pinPress('5')">5</button>
+    <button class="pin-btn" onclick="pinPress('6')">6</button>
+    <button class="pin-btn" onclick="pinPress('7')">7</button>
+    <button class="pin-btn" onclick="pinPress('8')">8</button>
+    <button class="pin-btn" onclick="pinPress('9')">9</button>
+    <button class="pin-btn empty"></button>
+    <button class="pin-btn" onclick="pinPress('0')">0</button>
+    <button class="pin-btn" onclick="pinDelete()">⌫</button>
+  </div>
+</div>
+
+<!-- Main App -->
 <div class="header">
   <div class="header-left">
-    <div class="dot" id="dot"></div>
+    <div class="dot"></div>
     <h1>Carpool Scanner</h1>
   </div>
   <div style="display:flex;align-items:center;gap:10px;">
     <span class="header-status" id="statusText">Ready</span>
     <div class="scan-count" id="scanCount">0</div>
+    <button class="lock-btn" onclick="lockApp()">🔒 Lock</button>
   </div>
 </div>
 
 <div class="main">
-  <!-- Camera -->
-  <div class="camera-panel">
-    <div class="video-wrapper" id="videoWrapper">
-      <video id="video" playsinline autoplay muted></video>
-      <canvas id="canvas"></canvas>
-      <div class="scan-overlay">
-        <div class="scan-frame">
-          <span></span>
-          <div class="scan-line" id="scanLine"></div>
-        </div>
-      </div>
-      <div class="flash" id="flash"></div>
+  <div class="input-panel">
+    <div class="scanner-icon">⚡</div>
+    <div class="ready-label">Ready to Scan</div>
+    <p class="sub-label">Connect your Bluetooth barcode scanner and scan a student ID, or type one below.</p>
+    <div class="scan-input-wrapper">
+      <input
+        class="scan-input"
+        id="scanInput"
+        placeholder="Scan or type ID…"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
+      >
+      <div class="hint">Barcode scanner will auto-submit · Press Enter to submit manually</div>
     </div>
-    <p class="camera-label" id="cameraLabel">Tap Start to activate camera</p>
-    <button class="btn-start" id="startBtn" onclick="startCamera()">Start Camera</button>
   </div>
 
-  <!-- Scans list -->
   <div class="scans-panel">
     <div class="panel-header">
       Recent Scans
@@ -391,13 +342,6 @@
   </div>
 </div>
 
-<!-- Manual fallback input -->
-<div class="manual-bar">
-  <input class="manual-input" id="manualInput" placeholder="Type or scan student ID manually…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-  <button class="manual-submit" onclick="submitManual()">Send</button>
-</div>
-
-<!-- Toast notification -->
 <div class="toast" id="toast">
   <div class="toast-icon" id="toastIcon">✅</div>
   <div>
@@ -408,117 +352,130 @@
 
 <script>
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwYjeojJLLURbZMxn1blDkCx7jyKCjSCNJUwUcOOxB-DO1RHUMLJfFl3BmSKTS5pA/exec";
-const LOCATION = "Walker";
+const LOCATION    = "Walker";
 const COOLDOWN_MS = 5000;
+const CORRECT_PIN = "1234"; // ← Change this to your PIN
 
-let scanning = false;
+let pinEntry = "";
 let lastScanned = {};
-let totalScans = 0;
-let animFrame;
+let totalScans  = 0;
+let unlocked    = false;
 
-const video    = document.getElementById("video");
-const canvas   = document.getElementById("canvas");
-const ctx      = canvas.getContext("2d", { willReadFrequently: true });
-const dot      = document.getElementById("dot");
-const statusTx = document.getElementById("statusText");
-const scanCount= document.getElementById("scanCount");
-const startBtn = document.getElementById("startBtn");
-const cameraLbl= document.getElementById("cameraLabel");
-const flash    = document.getElementById("flash");
-const scansList= document.getElementById("scansList");
-const toast    = document.getElementById("toast");
-const toastName= document.getElementById("toastName");
-const toastSub = document.getElementById("toastSub");
-const toastIcon= document.getElementById("toastIcon");
+const pinScreen = document.getElementById("pinScreen");
+const scanInput = document.getElementById("scanInput");
+const statusTx  = document.getElementById("statusText");
+const scanCount = document.getElementById("scanCount");
+const scansList = document.getElementById("scansList");
+const toast     = document.getElementById("toast");
+const toastName = document.getElementById("toastName");
+const toastSub  = document.getElementById("toastSub");
+const toastIcon = document.getElementById("toastIcon");
+const pinError  = document.getElementById("pinError");
 
-async function startCamera() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 1280 } }
-    });
-    video.srcObject = stream;
-    await video.play();
-    startBtn.classList.add("hidden");
-    cameraLbl.textContent = "Point camera at QR code or barcode";
-    dot.className = "dot scanning";
-    statusTx.textContent = "Scanning…";
-    scanning = true;
-    requestAnimationFrame(scanFrame);
-  } catch (err) {
-    cameraLbl.textContent = "Camera access denied — use manual input below";
-    statusTx.textContent = "No camera";
+// ── PIN logic ──
+function pinPress(digit) {
+  if (pinEntry.length >= 4) return;
+  pinEntry += digit;
+  updatePinDots();
+  if (pinEntry.length === 4) {
+    setTimeout(checkPin, 120);
   }
 }
 
-function scanFrame() {
-  if (!scanning) return;
-  if (video.readyState === video.HAVE_ENOUGH_DATA) {
-    canvas.width  = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: "dontInvert"
-    });
-    if (code && code.data) {
-      handleScan(code.data.trim());
-    }
-  }
-  animFrame = requestAnimationFrame(scanFrame);
+function pinDelete() {
+  pinEntry = pinEntry.slice(0, -1);
+  updatePinDots();
+  pinError.textContent = "";
 }
+
+function updatePinDots(state) {
+  for (let i = 0; i < 4; i++) {
+    const dot = document.getElementById("pd" + i);
+    dot.className = "pin-dot" + (i < pinEntry.length ? " filled" : "") + (state === "error" ? " error" : "");
+  }
+}
+
+function checkPin() {
+  if (pinEntry === CORRECT_PIN) {
+    pinScreen.classList.add("hidden");
+    unlocked = true;
+    scanInput.focus();
+  } else {
+    updatePinDots("error");
+    pinError.textContent = "Incorrect PIN — try again";
+    pinEntry = "";
+    setTimeout(() => { updatePinDots(); pinError.textContent = ""; }, 1000);
+  }
+}
+
+function lockApp() {
+  unlocked = false;
+  pinEntry = "";
+  updatePinDots();
+  pinError.textContent = "";
+  pinScreen.classList.remove("hidden");
+}
+
+// ── Scanner logic ──
+document.addEventListener("click", () => { if (unlocked) scanInput.focus(); });
+document.addEventListener("touchend", () => { if (unlocked) scanInput.focus(); });
+
+scanInput.addEventListener("keydown", e => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const val = scanInput.value.trim();
+    if (val) { handleScan(val); scanInput.value = ""; }
+  }
+});
+
+let typeTimer;
+scanInput.addEventListener("input", () => {
+  clearTimeout(typeTimer);
+  typeTimer = setTimeout(() => {
+    const val = scanInput.value.trim();
+    if (val.length >= 3) { handleScan(val); scanInput.value = ""; }
+  }, 80);
+});
 
 function handleScan(studentId) {
-  if (!studentId) return;
+  if (!studentId || !unlocked) return;
   const now = Date.now();
-  if (lastScanned[studentId] && (now - lastScanned[studentId]) < COOLDOWN_MS) return;
+  if (lastScanned[studentId] && (now - lastScanned[studentId]) < COOLDOWN_MS) {
+    showToast("⚠️", studentId, "Already scanned recently");
+    return;
+  }
   lastScanned[studentId] = now;
-
-  // Flash effect
-  flash.classList.add("go");
-  setTimeout(() => flash.classList.remove("go"), 150);
-
-  // Vibrate if available
   if (navigator.vibrate) navigator.vibrate(80);
-
   sendToSheet(studentId);
 }
 
 async function sendToSheet(studentId) {
-  dot.className = "dot active";
   statusTx.textContent = "Sending…";
-
   try {
-    const res = await fetch(APPS_SCRIPT_URL, {
+    await fetch(APPS_SCRIPT_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ studentId, location: LOCATION }),
       mode: "no-cors"
     });
-
-    // no-cors means we can't read the response body, so assume success
     totalScans++;
     scanCount.textContent = totalScans;
     addScanItem(studentId, "Logged", "success");
     showToast("✅", studentId, "Logged to sheet");
-
   } catch (err) {
     addScanItem(studentId, "Failed — check connection", "error");
     showToast("⚠️", studentId, "Send failed");
   }
-
-  dot.className = "dot scanning";
-  statusTx.textContent = "Scanning…";
+  statusTx.textContent = "Ready";
 }
 
 function addScanItem(id, sub, type) {
-  // Remove empty state
   const empty = scansList.querySelector(".empty-state");
   if (empty) empty.remove();
-
   const item = document.createElement("div");
-  item.className = `scan-item ${type}`;
-  const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  item.innerHTML = `<div class="scan-name">${id}</div><div class="scan-meta">${sub} · ${time}</div>`;
+  item.className = "scan-item " + type;
+  const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  item.innerHTML = '<div class="scan-name">' + id + '</div><div class="scan-meta">' + sub + " · " + time + "</div>";
   scansList.insertBefore(item, scansList.firstChild);
 }
 
@@ -533,22 +490,10 @@ function showToast(icon, name, sub) {
 }
 
 function clearScans() {
-  scansList.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><div>Scans will appear here</div></div>`;
+  scansList.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div>Scans will appear here</div></div>';
   totalScans = 0;
   scanCount.textContent = 0;
 }
-
-function submitManual() {
-  const input = document.getElementById("manualInput");
-  const val = input.value.trim();
-  if (!val) return;
-  handleScan(val);
-  input.value = "";
-}
-
-document.getElementById("manualInput").addEventListener("keydown", e => {
-  if (e.key === "Enter") submitManual();
-});
 </script>
 </body>
 </html>
