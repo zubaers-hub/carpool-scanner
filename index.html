@@ -33,8 +33,8 @@
     overflow: hidden;
   }
 
-  /* PIN screen */
-  .pin-screen {
+  /* Shared overlay screen */
+  .overlay-screen {
     position: fixed;
     inset: 0;
     background: var(--bg);
@@ -45,11 +45,14 @@
     gap: 20px;
     z-index: 999;
   }
-  .pin-screen.hidden { display: none; }
-  .pin-logo  { font-size: 52px; }
-  .pin-title { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
-  .pin-sub   { font-size: 14px; color: var(--muted); }
-  .pin-dots  { display: flex; gap: 14px; margin: 4px 0; }
+  .overlay-screen.hidden { display: none; }
+
+  .screen-logo  { font-size: 52px; }
+  .screen-title { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+  .screen-sub   { font-size: 14px; color: var(--muted); }
+
+  /* PIN */
+  .pin-dots { display: flex; gap: 14px; margin: 4px 0; }
   .pin-dot {
     width: 14px; height: 14px;
     border-radius: 50%;
@@ -82,6 +85,32 @@
   .pin-btn.empty  { background: transparent; border-color: transparent; pointer-events: none; }
   .pin-error { font-size: 13px; color: var(--danger); height: 18px; }
 
+  /* Station selector */
+  .station-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    max-width: 320px;
+  }
+  .station-btn {
+    background: var(--card);
+    border: 2px solid var(--border);
+    border-radius: 14px;
+    color: var(--text);
+    font-size: 18px;
+    font-weight: 600;
+    padding: 18px 24px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: border-color 0.15s, background 0.15s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .station-btn:active { background: var(--accent-dim); transform: scale(0.97); border-color: var(--accent); }
+  .station-icon { font-size: 24px; }
+
   /* Header */
   .header {
     background: var(--surface);
@@ -105,6 +134,14 @@
     50% { opacity: 0.4; }
   }
   .header h1 { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
+  .station-badge {
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--accent);
+    color: white;
+    padding: 2px 10px;
+    border-radius: 20px;
+  }
   .header-status { font-size: 12px; color: var(--muted); }
   .scan-count {
     background: var(--accent);
@@ -129,13 +166,8 @@
   .lock-btn:active { background: var(--border); }
 
   /* Main layout */
-  .main {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-  }
+  .main { display: flex; flex: 1; overflow: hidden; }
 
-  /* Scanner input panel */
   .input-panel {
     flex: 1;
     display: flex;
@@ -268,11 +300,11 @@
 </head>
 <body>
 
-<!-- PIN Lock Screen -->
-<div class="pin-screen" id="pinScreen">
-  <div class="pin-logo">🔒</div>
-  <div class="pin-title">Staff Access Only</div>
-  <div class="pin-sub">Enter PIN to continue</div>
+<!-- PIN Screen -->
+<div class="overlay-screen" id="pinScreen">
+  <div class="screen-logo">🔒</div>
+  <div class="screen-title">Staff Access Only</div>
+  <div class="screen-sub">Enter PIN to continue</div>
   <div class="pin-dots" id="pinDots">
     <div class="pin-dot" id="pd0"></div>
     <div class="pin-dot" id="pd1"></div>
@@ -296,11 +328,30 @@
   </div>
 </div>
 
+<!-- Station Selector Screen -->
+<div class="overlay-screen hidden" id="stationScreen">
+  <div class="screen-logo">📍</div>
+  <div class="screen-title">Select Your Station</div>
+  <div class="screen-sub">Which station are you working at?</div>
+  <div class="station-list">
+    <button class="station-btn" onclick="selectStation('Site A', '🅰️')">
+      <span class="station-icon">🅰️</span> Site A
+    </button>
+    <button class="station-btn" onclick="selectStation('Site B', '🅱️')">
+      <span class="station-icon">🅱️</span> Site B
+    </button>
+    <button class="station-btn" onclick="selectStation('Walker', '🚶')">
+      <span class="station-icon">🚶</span> Walker
+    </button>
+  </div>
+</div>
+
 <!-- Main App -->
 <div class="header">
   <div class="header-left">
     <div class="dot"></div>
     <h1>Carpool Scanner</h1>
+    <div class="station-badge" id="stationBadge">—</div>
   </div>
   <div style="display:flex;align-items:center;gap:10px;">
     <span class="header-status" id="statusText">Ready</span>
@@ -352,34 +403,34 @@
 
 <script>
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwYjeojJLLURbZMxn1blDkCx7jyKCjSCNJUwUcOOxB-DO1RHUMLJfFl3BmSKTS5pA/exec";
-const LOCATION    = "Walker";
+const CORRECT_PIN = "1234"; // ← Change this to your PIN
 const COOLDOWN_MS = 5000;
-const CORRECT_PIN = "0000"; // ← Change this to your PIN
 
-let pinEntry = "";
+let pinEntry    = "";
 let lastScanned = {};
 let totalScans  = 0;
 let unlocked    = false;
+let currentLocation = "";
 
-const pinScreen = document.getElementById("pinScreen");
-const scanInput = document.getElementById("scanInput");
-const statusTx  = document.getElementById("statusText");
-const scanCount = document.getElementById("scanCount");
-const scansList = document.getElementById("scansList");
-const toast     = document.getElementById("toast");
-const toastName = document.getElementById("toastName");
-const toastSub  = document.getElementById("toastSub");
-const toastIcon = document.getElementById("toastIcon");
-const pinError  = document.getElementById("pinError");
+const pinScreen     = document.getElementById("pinScreen");
+const stationScreen = document.getElementById("stationScreen");
+const scanInput     = document.getElementById("scanInput");
+const statusTx      = document.getElementById("statusText");
+const scanCount     = document.getElementById("scanCount");
+const scansList     = document.getElementById("scansList");
+const stationBadge  = document.getElementById("stationBadge");
+const toast         = document.getElementById("toast");
+const toastName     = document.getElementById("toastName");
+const toastSub      = document.getElementById("toastSub");
+const toastIcon     = document.getElementById("toastIcon");
+const pinError      = document.getElementById("pinError");
 
-// ── PIN logic ──
+// ── PIN ──
 function pinPress(digit) {
   if (pinEntry.length >= 4) return;
   pinEntry += digit;
   updatePinDots();
-  if (pinEntry.length === 4) {
-    setTimeout(checkPin, 120);
-  }
+  if (pinEntry.length === 4) setTimeout(checkPin, 120);
 }
 
 function pinDelete() {
@@ -398,8 +449,7 @@ function updatePinDots(state) {
 function checkPin() {
   if (pinEntry === CORRECT_PIN) {
     pinScreen.classList.add("hidden");
-    unlocked = true;
-    scanInput.focus();
+    stationScreen.classList.remove("hidden");
   } else {
     updatePinDots("error");
     pinError.textContent = "Incorrect PIN — try again";
@@ -408,15 +458,27 @@ function checkPin() {
   }
 }
 
+// ── Station ──
+function selectStation(name, icon) {
+  currentLocation = name;
+  stationBadge.textContent = icon + " " + name;
+  stationScreen.classList.add("hidden");
+  unlocked = true;
+  scanInput.focus();
+}
+
 function lockApp() {
   unlocked = false;
+  currentLocation = "";
   pinEntry = "";
   updatePinDots();
   pinError.textContent = "";
+  stationBadge.textContent = "—";
   pinScreen.classList.remove("hidden");
+  stationScreen.classList.add("hidden");
 }
 
-// ── Scanner logic ──
+// ── Scanner ──
 document.addEventListener("click", () => { if (unlocked) scanInput.focus(); });
 document.addEventListener("touchend", () => { if (unlocked) scanInput.focus(); });
 
@@ -455,13 +517,13 @@ async function sendToSheet(studentId) {
     await fetch(APPS_SCRIPT_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ studentId, location: LOCATION }),
+      body: JSON.stringify({ studentId, location: currentLocation }),
       mode: "no-cors"
     });
     totalScans++;
     scanCount.textContent = totalScans;
-    addScanItem(studentId, "Logged", "success");
-    showToast("✅", studentId, "Logged to sheet");
+    addScanItem(studentId, currentLocation, "success");
+    showToast("✅", studentId, currentLocation);
   } catch (err) {
     addScanItem(studentId, "Failed — check connection", "error");
     showToast("⚠️", studentId, "Send failed");
