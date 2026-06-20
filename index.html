@@ -491,6 +491,7 @@ scanInput.addEventListener("keydown", e => {
 });
 
 function handleScan(studentId) {
+  studentId = studentId.replace(/^0+/, ""); // strip leading zeros
   if (!studentId || !unlocked) return;
   const now = Date.now();
   if (lastScanned[studentId] && (now - lastScanned[studentId]) < COOLDOWN_MS) {
