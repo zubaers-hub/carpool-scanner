@@ -490,15 +490,6 @@ scanInput.addEventListener("keydown", e => {
   }
 });
 
-let typeTimer;
-scanInput.addEventListener("input", () => {
-  clearTimeout(typeTimer);
-  typeTimer = setTimeout(() => {
-    const val = scanInput.value.trim();
-    if (val.length >= 3) { handleScan(val); scanInput.value = ""; }
-  }, 80);
-});
-
 function handleScan(studentId) {
   if (!studentId || !unlocked) return;
   const now = Date.now();
