@@ -5,22 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<title>Carpool Scanner</title>
+<title>Student Dismissal</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   :root {
-    --bg: #0a0f1e;
-    --surface: #111827;
-    --card: #1a2236;
-    --accent: #3b82f6;
-    --accent-dim: #1d4ed8;
-    --success: #10b981;
+    --bg: #052e16;
+    --surface: #064e24;
+    --card: #065f2e;
+    --accent: #22c55e;
+    --accent-dim: #16a34a;
+    --success: #4ade80;
     --warning: #f59e0b;
     --danger: #ef4444;
-    --text: #f1f5f9;
-    --muted: #64748b;
-    --border: #1e293b;
+    --text: #f0fdf4;
+    --muted: #86efac;
+    --border: #14532d;
   }
 
   body {
@@ -350,7 +350,7 @@
 <div class="header">
   <div class="header-left">
     <div class="dot"></div>
-    <h1>Carpool Scanner</h1>
+    <h1>Student Dismissal</h1>
     <div class="station-badge" id="stationBadge">—</div>
   </div>
   <div style="display:flex;align-items:center;gap:10px;">
@@ -362,7 +362,7 @@
 
 <div class="main">
   <div class="input-panel">
-    <div class="scanner-icon">⚡</div>
+    <div class="scanner-icon" style="display:none"></div>
     <div class="ready-label">Ready to Scan</div>
     <p class="sub-label">Connect your Bluetooth barcode scanner and scan a student ID, or type one below.</p>
     <div class="scan-input-wrapper">
@@ -375,7 +375,7 @@
         autocapitalize="off"
         spellcheck="false"
       >
-      <div class="hint">Barcode scanner will auto-submit · Press Enter to submit manually</div>
+      <div class="hint"></div>
     </div>
   </div>
 
